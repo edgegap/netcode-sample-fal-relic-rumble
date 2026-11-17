@@ -1,3 +1,4 @@
 node_modules/
 client/config.local.js
 art/raw/
+art/models/

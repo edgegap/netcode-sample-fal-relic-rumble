@@ -24,7 +24,7 @@ export function createView(canvas, labels) {
   scene.fog = new THREE.Fog("#141a2a", 55, 95);
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
 
-  scene.add(new THREE.HemisphereLight("#dfe9ff", "#3a2f4a", 1.1));
+  scene.add(new THREE.HemisphereLight("#eef3ff", "#5a4a5a", 1.6));
   const sun = new THREE.DirectionalLight("#fff1d6", 2.2);
   sun.position.set(-14, 28, 12);
   sun.castShadow = true;
@@ -38,7 +38,7 @@ export function createView(canvas, labels) {
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
-  const grid = new THREE.GridHelper(ARENA * 2, 16, "#8493ad", "#6d7b93");
+  const grid = new THREE.GridHelper(ARENA * 2, 13, "#8493ad", "#6d7b93");
   grid.position.y = 0.01;
   scene.add(grid);
 
@@ -110,7 +110,6 @@ export function createView(canvas, labels) {
       const key = /run|sprint/i.test(clip.name) ? "run" : /walk/i.test(clip.name) ? "walk" : /idle|stand|breath/i.test(clip.name) ? "idle" : null;
       if (key && !actions[key]) actions[key] = mixer.clipAction(clip);
     }
-    if (mixer && !Object.keys(actions).length) actions.walk = mixer.clipAction(src.clips[0]);
     return { body, mixer, actions };
   }
 
@@ -147,18 +146,29 @@ export function createView(canvas, labels) {
 
   function play(actor, name) {
     const { actions } = actor.parts;
-    const next = actions[name] ?? actions.walk ?? actions.idle;
-    if (!next || actor.current === next) return;
-    next.reset().fadeIn(0.15).play();
+    // No idle clip (Meshy's rig comes with walk and run only): fade back to the rest pose.
+    const next = actions[name] ?? (name === "idle" ? null : actions.walk ?? actions.run ?? null);
+    if (actor.current === next) return;
     actor.current?.fadeOut(0.15);
+    next?.reset().fadeIn(0.15).play();
     actor.current = next;
   }
 
+  const glowGeo = new THREE.CircleGeometry(0.9, 28);
   function makeRelic() {
     const mesh = relicModel ? relicModel.clone() : new THREE.Mesh(relicGeo, relicMat);
     mesh.traverse((m) => (m.castShadow = true));
-    scene.add(mesh);
+    // A glowing disc on the floor shows where a free relic is, whatever the model looks like.
+    const glow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({ color: "#ffe066", transparent: true, opacity: 0.5, depthWrite: false }));
+    glow.rotation.x = -Math.PI / 2;
+    scene.add(mesh, glow);
+    mesh.userData.glow = glow;
     return mesh;
+  }
+  function dropRelic(id) {
+    const mesh = relics.get(id);
+    scene.remove(mesh, mesh.userData.glow);
+    relics.delete(id);
   }
 
   // ---- fal assets -----------------------------------------------------------------------------
@@ -167,11 +177,15 @@ export function createView(canvas, labels) {
 
   /** Scale a model to a size and put its base on the floor, centred. */
   function fit(model, { height, width }) {
-    const box = new THREE.Box3().setFromObject(model);
+    // "precise" measures the skinned vertices: a rigged model's nodes carry their own scale
+    // (Meshy's armature is 0.01), so the plain bounding box is far off.
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model, true);
     const size = box.getSize(new THREE.Vector3());
     const s = height ? height / size.y : width / Math.max(size.x, size.z);
     model.scale.multiplyScalar(s);
-    box.setFromObject(model);
+    model.updateMatrixWorld(true);
+    box.setFromObject(model, true);
     const c = box.getCenter(new THREE.Vector3());
     model.position.x -= c.x;
     model.position.z -= c.z;
@@ -186,10 +200,10 @@ export function createView(canvas, labels) {
     if (ASSETS.floor) {
       tex.load(ASSETS.floor, (t) => {
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.repeat.set(4, 4);
+        t.repeat.set(2, 2);
         t.colorSpace = THREE.SRGBColorSpace;
         floorMat.map = t;
-        floorMat.color.set("#ffffff");
+        floorMat.color.set("#d6d6d6");
         floorMat.needsUpdate = true;
         grid.visible = false;
       });
@@ -197,18 +211,27 @@ export function createView(canvas, labels) {
     if (ASSETS.backdrop) tex.load(ASSETS.backdrop, (t) => ((t.colorSpace = THREE.SRGBColorSpace), (scene.background = t), (scene.fog = null)));
 
     const jobs = [];
-    (ASSETS.characters ?? []).forEach((url, seat) => {
-      jobs.push(loadModel(url).then((g) => {
+    (ASSETS.characters ?? []).forEach((entry, seat) => {
+      // An entry is a GLB path, or { model, walk, run, idle } when the clips come as separate
+      // armature-only GLBs (what Meshy's rigging returns): same skeleton, so the clips apply as is.
+      const files = typeof entry === "string" ? { model: entry } : entry ?? {};
+      const clipFiles = Object.entries(files).filter(([key, url]) => key !== "model" && url);
+      jobs.push(Promise.all([loadModel(files.model), ...clipFiles.map(([, url]) => loadModel(url))]).then(([g, ...extra]) => {
         if (!g) return;
-        characterModels[seat] = { scene: fit(g.scene, { height: ASSETS.characterHeight ?? 1.9 }), clips: g.animations ?? [] };
+        const clips = (g.animations ?? []).filter((c) => c.duration > 0);
+        extra.forEach((x, i) => {
+          const clip = x?.animations?.[0];
+          if (clip) clips.push(Object.assign(clip, { name: clipFiles[i][0] }));
+        });
+        characterModels[seat] = { scene: fit(g.scene, { height: ASSETS.characterHeight ?? 1.9 }), clips };
         for (const a of actors.values()) if (a.seat === seat) setBody(a);
       }));
     });
     jobs.push(loadModel(ASSETS.relic).then((g) => {
       if (!g) return;
-      relicModel = fit(g.scene, { height: 0.9 });
-      relicModel.children[0].position.y -= 0.45; // spin around its middle
-      for (const [id, mesh] of relics) (scene.remove(mesh), relics.delete(id));
+      relicModel = fit(g.scene, { height: 1.3 });
+      relicModel.children[0].position.y -= 0.65; // spin around its middle
+      for (const id of [...relics.keys()]) dropRelic(id);
       for (const h of homes) (h.trophies.forEach((t) => h.holder.remove(t)), (h.trophies = []));
     }));
     jobs.push(loadModel(ASSETS.pillar).then((g) => {
@@ -247,8 +270,9 @@ export function createView(canvas, labels) {
       camera.aspect = w / h;
       // Pull back on narrow screens so the whole floor stays in view.
       const fit = Math.max(1, 1.25 / camera.aspect);
-      camera.position.set(0, 34 * fit, 25 * fit);
-      camera.lookAt(0, 0, 1.5);
+      const d = (ARENA / 16) * fit;
+      camera.position.set(0, 34 * d, 25 * d);
+      camera.lookAt(0, 0, 1.2);
       camera.updateProjectionMatrix();
     }
   }
@@ -292,7 +316,7 @@ export function createView(canvas, labels) {
       }
       scores[p.seat] = p.score;
 
-      v.set(p.x, 2.7, p.z).project(camera);
+      v.set(p.x, 3.3, p.z).project(camera);
       a.label.textContent = p.name;
       a.label.classList.toggle("me", !!p.me);
       a.label.style.transform = `translate(-50%, -100%) translate(${((v.x + 1) / 2) * canvas.clientWidth}px, ${((1 - v.y) / 2) * canvas.clientHeight}px)`;
@@ -310,10 +334,14 @@ export function createView(canvas, labels) {
       let mesh = relics.get(r.id);
       if (!mesh) relics.set(r.id, (mesh = makeRelic()));
       const held = r.holder != null;
-      mesh.position.set(r.x, held ? 2.5 : 0.75 + Math.sin(clock * 3 + r.id) * 0.12, r.z);
+      mesh.position.set(r.x, held ? 3.4 : 1.0 + Math.sin(clock * 3 + r.id) * 0.12, r.z);
       mesh.rotation.y = clock * 1.6 + r.id;
+      const glow = mesh.userData.glow;
+      glow.visible = !held;
+      glow.position.set(r.x, 0.05, r.z);
+      glow.material.opacity = 0.4 + Math.sin(clock * 4 + r.id) * 0.15;
     }
-    for (const [id, mesh] of relics) if (!seenRelics.has(id)) (scene.remove(mesh), relics.delete(id));
+    for (const id of [...relics.keys()]) if (!seenRelics.has(id)) dropRelic(id);
 
     // Banked relics sit on their owner's pedestal.
     homes.forEach((h, seat) => {

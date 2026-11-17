@@ -4,10 +4,10 @@
 //
 // The floor is the x/z plane, centred on 0,0. Angles are radians around y (0 faces +z).
 
-export const ARENA = 16; // half-size of the square floor
+export const ARENA = 13; // half-size of the square floor
 export const WIN_SCORE = 5;
 export const PLAYER_RADIUS = 0.7;
-export const HOME_RADIUS = 2.4;
+export const HOME_RADIUS = 2.2;
 export const SHOVE_RANGE = 2.6;
 export const SHOVE_COOLDOWN = 1.2;
 export const RELIC_COUNT = 3;
@@ -24,18 +24,18 @@ const DROP_LOCK = 0.5; // a dropped relic can't be picked up for this long
 
 /** Home pedestal of each seat (0..3), one per corner. */
 export const HOMES = [
-  { x: -12, z: -12 },
-  { x: 12, z: 12 },
-  { x: 12, z: -12 },
-  { x: -12, z: 12 },
+  { x: -9.5, z: -9.5 },
+  { x: 9.5, z: 9.5 },
+  { x: 9.5, z: -9.5 },
+  { x: -9.5, z: 9.5 },
 ];
 
 /** Pillars: axis-aligned boxes {x, z, w, d} (centre and size). */
 export const OBSTACLES = [
-  { x: -6, z: 0, w: 2.2, d: 2.2 },
-  { x: 6, z: 0, w: 2.2, d: 2.2 },
-  { x: 0, z: -6, w: 2.2, d: 2.2 },
-  { x: 0, z: 6, w: 2.2, d: 2.2 },
+  { x: -5, z: 0, w: 2.2, d: 2.2 },
+  { x: 5, z: 0, w: 2.2, d: 2.2 },
+  { x: 0, z: -5, w: 2.2, d: 2.2 },
+  { x: 0, z: 5, w: 2.2, d: 2.2 },
 ];
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -64,11 +64,11 @@ function placeRelic(world, relic) {
   // Somewhere in the middle of the floor, away from pillars and from the other relics.
   for (let tries = 0; tries < 40; tries++) {
     const a = Math.random() * Math.PI * 2;
-    const d = 1 + Math.random() * 7.5;
+    const d = 1 + Math.random() * 6;
     const x = Math.cos(a) * d;
     const z = Math.sin(a) * d;
     const inPillar = OBSTACLES.some((o) => Math.abs(x - o.x) < o.w / 2 + 1 && Math.abs(z - o.z) < o.d / 2 + 1);
-    const crowded = world.relics.some((r) => r !== relic && r.holder == null && Math.hypot(r.x - x, r.z - z) < 3);
+    const crowded = world.relics.some((r) => r !== relic && r.holder == null && Math.hypot(r.x - x, r.z - z) < 2.5);
     if (inPillar || crowded) continue;
     relic.x = x;
     relic.z = z;
