@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Relic Rumble</title>
+  <!-- Three.js and the Edgegap JS SDK from a CDN, pinned. The integrity hash makes the browser
+       refuse a modified SDK file. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+        "@edgegap/sdk": "https://cdn.jsdelivr.net/npm/@edgegap/sdk@1.1.0/dist/browser/edgegap.js"
+      },
+      "integrity": {
+        "https://cdn.jsdelivr.net/npm/@edgegap/sdk@1.1.0/dist/browser/edgegap.js": "sha384-U8KQMl3e8xF4aAIJJMXV8IdkCKWiHSQhHISsedbG4z/L99dNOq5FoRlMgPDYgNUF"
+      }
+    }
+  </script>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0d111c; color: #eef2fa; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    .stage { position: fixed; inset: 0; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    .labels, .hud { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .label { position: absolute; left: 0; top: 0; font-size: 12px; font-weight: 600; padding: 1px 6px; border-radius: 8px;
+      background: rgba(10, 14, 24, 0.6); white-space: nowrap; }
+    .label.me { background: rgba(255, 255, 255, 0.9); color: #10141f; }
+    .banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px;
+      background: rgba(10, 14, 24, 0.7); font-weight: 600; }
+    .banner:empty { display: none; }
+    .big { position: absolute; top: 34%; width: 100%; text-align: center; font-size: clamp(2rem, 8vw, 4.5rem); font-weight: 800;
+      text-shadow: 0 4px 24px rgba(0, 0, 0, 0.7); }
+    .sub { position: absolute; top: calc(34% + 5.2rem); width: 100%; text-align: center; color: #ffd166; }
+    .scores { position: absolute; top: 12px; left: 12px; margin: 0; padding: 8px 10px; list-style: none; border-radius: 10px;
+      background: rgba(10, 14, 24, 0.7); font-size: 14px; min-width: 150px; }
+    .scores:empty { display: none; }
+    .scores li { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+    .scores li.me { font-weight: 800; }
+    .scores i { width: 12px; height: 12px; border-radius: 50%; }
+    .scores span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+    .corner { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+    button { border: 1px solid #ffcf40; border-radius: 8px; background: #2b2412; color: #eef2fa; padding: 10px 18px;
+      font: inherit; font-weight: 700; cursor: pointer; }
+    button:hover { background: #40351a; }
+    button.primary { background: #b98300; color: #fff; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    [hidden] { display: none !important; }
+    .menu { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 20px;
+      background: rgba(8, 11, 20, 0.78); text-align: center; }
+    .menu h1 { margin: 0; font-size: clamp(2rem, 7vw, 3.6rem); letter-spacing: 0.04em; color: #ffcf40; }
+    .menu p { margin: 0; color: #b9c3d6; max-width: 34rem; line-height: 1.5; }
+    .menu input { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid #47526b; background: #121828; color: inherit; width: 220px; }
+    .menu .buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .status { min-height: 1.4em; color: #ffd166 !important; }
+    .touch { display: none; }
+    @media (pointer: coarse) {
+      .touch { display: block; }
+      .stick { position: absolute; left: 22px; bottom: 26px; width: 120px; height: 120px; border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12); border: 2px solid rgba(255, 255, 255, 0.3); touch-action: none; }
+      .knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, 0.6); }
+      .shove { position: absolute; right: 26px; bottom: 40px; width: 96px; height: 96px; border-radius: 50%; touch-action: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <canvas id="game" aria-label="Relic Rumble game"></canvas>
+    <div class="labels" id="labels"></div>
+    <div class="hud">
+      <ul class="scores" id="scores"></ul>
+      <div class="banner" id="banner"></div>
+      <div class="big" id="big"></div>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="corner">
+      <button id="again" type="button" hidden>Play again</button>
+      <button id="leave" type="button" hidden>Menu</button>
+    </div>
+    <div class="touch">
+      <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
+      <button class="shove" id="shove" type="button">Shove</button>
+    </div>
+    <div class="menu" id="menu">
+      <h1>RELIC RUMBLE</h1>
+      <p>Grab a relic, carry it to your corner, shove anyone who tries the same. First to 5 wins.<br>
+        Move: WASD or arrows · Shove: Space</p>
+      <label>Name <input id="name" maxlength="16" autocomplete="off"></label>
+      <div class="buttons">
+        <button id="find" class="primary" type="button">Find match</button>
+        <button id="solo" type="button">Play vs bots</button>
+        <button id="local" type="button" hidden>Local server :7777</button>
+        <button id="cancel" type="button" hidden>Cancel</button>
+      </div>
+      <p id="status" class="status"></p>
+    </div>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
