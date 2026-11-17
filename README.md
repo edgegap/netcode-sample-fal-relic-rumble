@@ -1,11 +1,13 @@
 # Relic Rumble: a 3D game made with fal.ai assets, multiplayer on Edgegap
 
-![Two players and two bots in an online match](docs/images/online-match.jpg)
+![Make your fal.ai game multiplayer: Relic Rumble on Edgegap](docs/images/card.jpg)
 
 A worked example you can follow step by step. A coding agent writes a 3D browser game (Three.js),
 **fal.ai** generates everything you see and hear (rigged characters, props, floor, sounds), and
 **Edgegap** makes it online: a matchmaker puts 2 to 4 players together and starts one authoritative
 server for their match.
+
+![Relic Rumble: four fal-generated characters, pillars, pedestals and relics](docs/images/gameplay.jpg)
 
 In Relic Rumble four raiders grab relics in the middle of the floor and carry them to their own
 corner. A shove knocks a rival back and makes them drop what they carry. First to 5 wins.
