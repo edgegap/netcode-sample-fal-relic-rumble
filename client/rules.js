@@ -174,7 +174,8 @@ export function botInput(world, id) {
     }
   }
   const n = Math.hypot(dx, dz) || 1;
-  return { mx: dx / n, mz: dz / n, shove };
+  // Bots walk at 80% so a human who plays well can beat them.
+  return { mx: (dx / n) * 0.8, mz: (dz / n) * 0.8, shove };
 }
 
 /** Advance the world by dt seconds. Returns what happened, for scores, sounds and effects. */
