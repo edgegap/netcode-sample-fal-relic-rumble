@@ -32,8 +32,7 @@ only while people play.
 
 Verified on 2026-11-17: two headless players (`tests/e2e.mjs`) and two real browser tabs were
 matched through the Edgegap matchmaker onto one server, played a full match, and the server stopped
-itself 20 seconds after it. A match runs on one 0.25 vCPU server. Not tested: two players on
-different networks, phones.
+itself 20 seconds after it. A match runs on one 0.25 vCPU server.
 
 ## What you need
 
