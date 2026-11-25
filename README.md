@@ -44,7 +44,7 @@ itself 20 seconds after it. A match runs on one 0.25 vCPU server.
 - A coding agent (Claude Code, Codex, Cursor...) with two connections:
   - fal: the `genmedia` CLI (`genmedia setup`), or the fal MCP server
     (`claude mcp add --transport http --scope user fal https://mcp.fal.ai/mcp-relay`);
-  - Edgegap: the MCP server at `https://mcp.edgegap.dev`. Its `edgegap-fal` skill holds this
+  - Edgegap: the MCP server at `https://mcp.edgegap.com/mcp`. Its `edgegap-fal` skill holds this
     workflow, the server templates, the matchmaker config and the tests.
 
 ## Step 1: Build the game as a graybox, rules in their own file
